@@ -1,9 +1,10 @@
-name: Daily ISS Location Logger with Cache
+name: Log ISS Location Data Daily
 
 on:
   schedule:
-    - cron: "0 12 * * *" # Every day at 12:00 UTC
-  workflow_dispatch:
+    # Runs at 12:00 UTC (noon) every day
+    - cron: "0 12 * * *"
+  workflow_dispatch: # Allows manual triggering
 
 jobs:
   collect-iss-data:
@@ -15,35 +16,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Cache pip dependencies
-        uses: actions/cache@v4
-        id: pip-cache
-        with:
-          path: ~/.cache/pip
-          key: cache-f85aaf1
-
-      - name: Prime cache - cache-f85aaf1
-        run: echo "Cache hit: ${{ steps.pip-cache.outputs.cache-hit }}"
-
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
       - name: Fetch ISS location data
-        run: |
-          python - << 'EOF'
-          import requests, os
-          file_path = 'iss-location.jsonl'
+        run: | # python
+          uv run --with requests python << 'EOF'
+          import requests
+
           data = requests.get('http://api.open-notify.org/iss-now.json').text
-          if not os.path.exists(file_path):
-              with open(file_path, 'w') as f:
-                  f.write(data + '\n')
-          else:
-              with open(file_path, 'a') as f:
-                  f.write(data + '\n')
-          EOF
+          with open('iss-location.jsonl', 'a') as f:
+              f.write(data + '\n')
+          'EOF'
 
       - name: Commit and push changes
-        run: |
+        run: | # shell
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add iss-location.jsonl
