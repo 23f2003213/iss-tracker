@@ -29,19 +29,23 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       - name: Fetch ISS location data
-        run: | # python
-          uv run --with requests python << 'EOF'
-          import requests
+        run: |
+          python - << 'EOF'
+          import requests, os
+          file_path = 'iss-location.jsonl'
           data = requests.get('http://api.open-notify.org/iss-now.json').text
-          with open('iss-location.jsonl', 'a') as f:
-              f.write(data + '\n')
-          'EOF'
+          if not os.path.exists(file_path):
+              with open(file_path, 'w') as f:
+                  f.write(data + '\n')
+          else:
+              with open(file_path, 'a') as f:
+                  f.write(data + '\n')
+          EOF
 
       - name: Commit and push changes
-        run: | # shell
+        run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add iss-location.jsonl
           git commit -m "Update ISS position data [skip ci]" || exit 0
           git push
-
