@@ -1,47 +1,47 @@
-# This workflow runs daily, fetches the current ISS location,
-# and commits the data to the repository.
-
 name: Log ISS Location Data Daily
 
 on:
   schedule:
-    # Runs at 12:00 UTC (noon) every day
     - cron: "0 12 * * *"
-  
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 jobs:
   collect-iss-data:
     runs-on: ubuntu-latest
     permissions:
-      # Required to allow the action to write to the repository
       contents: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install uv (Python package installer)
-        # Updated to v5 as per your latest code
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        id: pip-cache
+        with:
+          path: ~/.cache/pip
+          key: cache-pip-${{ runner.os }}-${{ hashFiles('**/requirements*.txt') }}
+
+      # ✅ Do NOT reference cache-hit if you don’t need it
+      # - name: Show cache status
+      #   run: echo "Cache hit: ${{ steps.pip-cache.outputs.cache-hit }}"
+
+      - name: Install uv
         uses: astral-sh/setup-uv@v5
 
       - name: Fetch ISS location data
         run: |
           uv run --with requests python << 'EOF'
           import requests
-
           data = requests.get('http://api.open-notify.org/iss-now.json').text
           with open('iss-location.jsonl', 'a') as f:
               f.write(data + '\n')
-          'EOF'
+          EOF
 
       - name: Commit and push changes
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add iss-location.jsonl
-          # Updated commit logic to only commit if there are changes
           git diff --cached --quiet || git commit -m "Update ISS position data [skip ci]"
           git push
-
