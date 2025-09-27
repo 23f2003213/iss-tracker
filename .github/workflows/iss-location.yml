@@ -2,7 +2,7 @@ name: Log ISS Location Data Daily
 
 on:
   schedule:
-    - cron: "0 12 * * *"  # Runs at 12:00 UTC daily
+    - cron: "0 12 * * *"
   workflow_dispatch:
 
 jobs:
@@ -15,49 +15,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Cache pip dependencies
-      - name: Cache pip dependencies
-        id: pip-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: cache-f85aaf1
-
-      - name: Show pip cache hit
-        run: echo "Pip cache hit: ${{ steps.pip-cache.outputs.cache-hit }}"
-
-      # Install uv with caching
-      - name: Cache UV
-        id: uv-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.local/share/uv
-          key: uv-cache-0.8.22
-
       - name: Install uv
         uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
 
-      - name: Show UV cache hit
-        run: echo "UV cache hit: ${{ steps.uv-cache.outputs.cache-hit }}"
-
-      # Fetch ISS location
       - name: Fetch ISS location data
         run: |
-          python - << 'EOF'
+          uv run --with requests python << 'EOF'
 import requests
-file_path = 'iss-location.jsonl'
+
 data = requests.get('http://api.open-notify.org/iss-now.json').text
-with open(file_path, 'a') as f:
+with open('iss-location.jsonl', 'a') as f:
     f.write(data + '\n')
 EOF
 
-      # Commit & push if updated
       - name: Commit and push changes
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add iss-location.jsonl
-          git diff --cached --quiet || git commit -m "Update ISS position data [skip ci]"
+          git commit -m "Update ISS position data [skip ci]" || exit 0
           git push
