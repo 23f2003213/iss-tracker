@@ -1,38 +1,61 @@
-name: Log ISS Location Data Daily
+# This workflow demonstrates how to use actions/cache to speed up builds.
+# It caches npm dependencies to avoid re-downloading them on every run.
 
+name: CI with Dependency Caching
+
+# Controls when the workflow will run
 on:
-  schedule:
-    # Runs at 12:00 UTC (noon) every day
-    - cron: "0 12 * * *"
-  workflow_dispatch: # Allows manual triggering
+  # Triggers the workflow on push events but only for the main branch
+  push:
+    branches: [ "main" ]
+  
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
 
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  collect-iss-data:
+  build:
+    # The type of runner that the job will run on
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
+    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
+      # 1. Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
+      # 2. Sets up Node.js environment for using npm
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
-      - name: Fetch ISS location data
-        run: | # python
-          uv run --with requests python << 'EOF'
-          import requests
+      # 3. Caches dependencies using the specified key.
+      # The 'id' allows us to reference the output of this step later.
+      - name: Cache node modules
+        id: cache-npm-dependencies
+        uses: actions/cache@v4
+        with:
+          # The path to the directory to cache
+          path: node_modules
+          # The specific, static key to save and restore the cache
+          key: cache-f85aaf1
 
-          data = requests.get('http://api.open-notify.org/iss-now.json').text
-          with open('iss-location.jsonl', 'a') as f:
-              f.write(data + '\n')
-          'EOF'
+      # 4. This is the specific step requested in the prompt.
+      # It checks the 'cache-hit' output from the previous step to report if the cache was restored.
+      - name: prime-cache-f85aaf1
+        run: echo "The cache-hit status was: ${{ steps.cache-npm-dependencies.outputs.cache-hit }}"
 
-      - name: Commit and push changes
-        run: | # shell
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add iss-location.jsonl
-          git commit -m "Update ISS position data [skip ci]" || exit 0
-          git push
+      # 5. This step only runs if the cache was NOT found in the previous step.
+      # On the first run, this will execute. On subsequent runs, it will be skipped.
+      - name: Install dependencies if cache not hit
+        if: steps.cache-npm-dependencies.outputs.cache-hit != 'true'
+        run: |
+          echo "Cache miss. Installing dependencies..."
+          # Create a dummy package.json for demonstration purposes
+          echo '{ "name": "caching-demo", "version": "1.0.0" }' > package.json
+          npm install
+      
+      # 6. A placeholder for your actual build or test command
+      - name: Run build
+        run: echo "Build process would run here, using the cached dependencies."
